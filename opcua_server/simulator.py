@@ -1,4 +1,5 @@
 import asyncio
+import random
 
 
 async def simulate(nodes):
@@ -8,41 +9,37 @@ async def simulate(nodes):
     while True:
 
         # =========================================================
-        # READ CURRENT CONTROL VALUES
+        # READ CONTROL VALUES
         # =========================================================
 
-        speed_setpoint = await nodes["speed_setpoint"].read_value()
-        temperature_setpoint = await nodes["temperature_setpoint"].read_value()
-        pressure_setpoint = await nodes["pressure_setpoint"].read_value()
-        flow_rate_setpoint = await nodes["flow_rate_setpoint"].read_value()
+        speed_setpoint = await nodes[
+            "speed_setpoint"
+        ].read_value()
 
-        start_command = await nodes["start_command"].read_value()
-        stop_command = await nodes["stop_command"].read_value()
-        reset_command = await nodes["reset_command"].read_value()
+        temperature_setpoint = await nodes[
+            "temperature_setpoint"
+        ].read_value()
 
-        machine_running = await nodes["machine_running"].read_value()
-        fault_active = await nodes["fault_active"].read_value()
+        start_command = await nodes[
+            "start_command"
+        ].read_value()
+
+        stop_command = await nodes[
+            "stop_command"
+        ].read_value()
 
         # =========================================================
-        # RESET COMMAND
+        # START COMMAND
         # =========================================================
 
-        if reset_command:
+        if start_command:
 
-            await nodes["fault_active"].write_value(False)
-            await nodes["emergency_stop"].write_value(False)
+            await nodes["machine_running"].write_value(True)
+            await nodes["machine_status"].write_value("RUNNING")
 
-            await nodes["high_temperature_alarm"].write_value(False)
-            await nodes["high_pressure_alarm"].write_value(False)
-            await nodes["motor_overload_alarm"].write_value(False)
-            await nodes["low_level_alarm"].write_value(False)
-            await nodes["high_vibration_alarm"].write_value(False)
+            await nodes["start_command"].write_value(False)
 
-            await nodes["machine_status"].write_value("READY")
-
-            await nodes["reset_command"].write_value(False)
-
-            print("Machine reset.")
+            print("Machine started.")
 
         # =========================================================
         # STOP COMMAND
@@ -51,38 +48,23 @@ async def simulate(nodes):
         if stop_command:
 
             await nodes["machine_running"].write_value(False)
-            await nodes["motor_running"].write_value(False)
-
             await nodes["machine_status"].write_value("STOPPED")
-
-            await nodes["motor_speed"].write_value(0.0)
 
             await nodes["stop_command"].write_value(False)
 
             print("Machine stopped.")
 
         # =========================================================
-        # START COMMAND
+        # READ MACHINE STATE
         # =========================================================
 
-        if start_command and not fault_active:
+        machine_running = await nodes[
+            "machine_running"
+        ].read_value()
 
-            await nodes["machine_running"].write_value(True)
-            await nodes["motor_running"].write_value(True)
-            await nodes["machine_ready"].write_value(True)
-
-            await nodes["machine_status"].write_value("RUNNING")
-
-            await nodes["start_command"].write_value(False)
-
-            print("Machine started.")
-
-        # =========================================================
-        # READ MACHINE STATE AGAIN
-        # =========================================================
-
-        machine_running = await nodes["machine_running"].read_value()
-        fault_active = await nodes["fault_active"].read_value()
+        fault_active = await nodes[
+            "fault_active"
+        ].read_value()
 
         # =========================================================
         # MACHINE RUNNING
@@ -91,100 +73,174 @@ async def simulate(nodes):
         if machine_running and not fault_active:
 
             # -----------------------------------------------------
-            # Motor
+            # Motor Speed
             # -----------------------------------------------------
 
-            current_speed = await nodes["motor_speed"].read_value()
+            current_speed = await nodes[
+                "motor_speed"
+            ].read_value()
 
-            # Gradually move motor speed toward setpoint
             difference = speed_setpoint - current_speed
 
+            # Gradually move motor speed toward setpoint
             if abs(difference) > 20:
-                current_speed += 20 if difference > 0 else -20
+
+                current_speed += (
+                    20 if difference > 0 else -20
+                )
+
             else:
+
                 current_speed = speed_setpoint
-
-            motor_current = 10.0 + (current_speed / 1500.0) * 4.0
-
-            motor_power = (current_speed / 1500.0) * 7.5
-
-            motor_temperature = 60.0 + (
-                current_speed / 1500.0
-            ) * 15.0
 
             await nodes["motor_speed"].write_value(
                 round(current_speed, 2)
+            )
+
+            # -----------------------------------------------------
+            # Motor Current
+            # -----------------------------------------------------
+
+            base_current = (
+                10.0
+                + (current_speed / 1500.0) * 4.0
+            )
+
+            motor_current = (
+                base_current
+                + random.uniform(-0.3, 0.3)
             )
 
             await nodes["motor_current"].write_value(
                 round(motor_current, 2)
             )
 
+            # -----------------------------------------------------
+            # Motor Power
+            # -----------------------------------------------------
+
+            base_power = (
+                current_speed / 1500.0
+            ) * 7.5
+
+            motor_power = (
+                base_power
+                + random.uniform(-0.15, 0.15)
+            )
+
             await nodes["motor_power"].write_value(
-                round(motor_power, 2)
+                round(max(0, motor_power), 2)
+            )
+
+            # -----------------------------------------------------
+            # Motor Temperature
+            # -----------------------------------------------------
+
+            base_motor_temperature = (
+                60.0
+                + (current_speed / 1500.0) * 15.0
+            )
+
+            motor_temperature = (
+                base_motor_temperature
+                + random.uniform(-1.0, 1.0)
             )
 
             await nodes["motor_temperature"].write_value(
                 round(motor_temperature, 2)
             )
 
-            await nodes["motor_running"].write_value(True)
-
             # -----------------------------------------------------
-            # Process
+            # Process Temperature
             # -----------------------------------------------------
 
-            process_temperature = (
+            base_process_temperature = (
                 temperature_setpoint
                 + (current_speed - speed_setpoint) * 0.01
             )
 
-            process_pressure = (
-                pressure_setpoint
-                + (current_speed - speed_setpoint) * 0.001
-            )
-
-            flow_rate = (
-                flow_rate_setpoint
-                * (current_speed / speed_setpoint)
-                if speed_setpoint > 0
-                else 0
-            )
-
-            tank_level = await nodes["tank_level"].read_value()
-
-            # Tank level slowly changes during production
-            tank_level += 0.2
-
-            if tank_level > 100:
-                tank_level = 60
-
-            vibration = 2.0 + (
-                abs(current_speed - speed_setpoint) / 1000
+            process_temperature = (
+                base_process_temperature
+                + random.uniform(-1.0, 1.0)
             )
 
             await nodes["process_temperature"].write_value(
                 round(process_temperature, 2)
             )
 
+            # -----------------------------------------------------
+            # Process Pressure
+            # -----------------------------------------------------
+
+            base_pressure = (
+                5.0
+                + (current_speed / 1500.0) * 0.5
+            )
+
+            process_pressure = (
+                base_pressure
+                + random.uniform(-0.08, 0.08)
+            )
+
             await nodes["process_pressure"].write_value(
                 round(process_pressure, 2)
             )
 
-            await nodes["flow_rate"].write_value(
-                round(flow_rate, 2)
+            # -----------------------------------------------------
+            # Flow Rate
+            # -----------------------------------------------------
+
+            base_flow = (
+                120.0
+                * (current_speed / 1500.0)
             )
+
+            flow_rate = (
+                base_flow
+                + random.uniform(-2.0, 2.0)
+            )
+
+            await nodes["flow_rate"].write_value(
+                round(max(0, flow_rate), 2)
+            )
+
+            # -----------------------------------------------------
+            # Tank Level
+            # -----------------------------------------------------
+
+            tank_level = await nodes[
+                "tank_level"
+            ].read_value()
+
+            tank_level += random.uniform(0.1, 0.3)
+
+            if tank_level > 100:
+                tank_level = 60
 
             await nodes["tank_level"].write_value(
                 round(tank_level, 2)
             )
 
+            # -----------------------------------------------------
+            # Vibration
+            # -----------------------------------------------------
+
+            base_vibration = (
+                2.0
+                + abs(current_speed - speed_setpoint) / 1000
+            )
+
+            vibration = (
+                base_vibration
+                + random.uniform(-0.2, 0.2)
+            )
+
             await nodes["vibration"].write_value(
-                round(vibration, 2)
+                round(max(0, vibration), 2)
             )
 
             # -----------------------------------------------------
-            # Production
+            # Production Count
             # -----------------------------------------------------
 
             production_count = await nodes[
@@ -203,13 +259,11 @@ async def simulate(nodes):
 
         else:
 
-            await nodes["motor_running"].write_value(False)
-
             current_speed = await nodes[
                 "motor_speed"
             ].read_value()
 
-            # Gradually bring motor speed down
+            # Gradually reduce motor speed
             if current_speed > 0:
 
                 current_speed -= 50
@@ -221,16 +275,13 @@ async def simulate(nodes):
                     current_speed
                 )
 
+            # Motor values go to zero when stopped
             await nodes["motor_current"].write_value(0.0)
             await nodes["motor_power"].write_value(0.0)
 
         # =========================================================
         # ALARM LOGIC
         # =========================================================
-
-        motor_temperature = await nodes[
-            "motor_temperature"
-        ].read_value()
 
         process_temperature = await nodes[
             "process_temperature"
@@ -240,96 +291,59 @@ async def simulate(nodes):
             "process_pressure"
         ].read_value()
 
-        tank_level = await nodes[
-            "tank_level"
-        ].read_value()
-
-        vibration = await nodes[
-            "vibration"
-        ].read_value()
-
         # ---------------------------------------------------------
-        # High Temperature
+        # High Temperature Alarm
         # ---------------------------------------------------------
 
         high_temperature = (
-            process_temperature > temperature_setpoint + 5
+            process_temperature
+            > temperature_setpoint + 5
         )
 
-        await nodes["high_temperature_alarm"].write_value(
-            high_temperature
-        )
+        await nodes[
+            "high_temperature_alarm"
+        ].write_value(high_temperature)
 
         # ---------------------------------------------------------
-        # High Pressure
+        # High Pressure Alarm
         # ---------------------------------------------------------
 
         high_pressure = (
-            process_pressure > pressure_setpoint + 0.5
+            process_pressure > 5.7
         )
 
-        await nodes["high_pressure_alarm"].write_value(
-            high_pressure
-        )
+        await nodes[
+            "high_pressure_alarm"
+        ].write_value(high_pressure)
 
-        # ---------------------------------------------------------
-        # Motor Overload
-        # ---------------------------------------------------------
-
-        motor_current = await nodes[
-            "motor_current"
-        ].read_value()
-
-        motor_overload = motor_current > 14.0
-
-        await nodes["motor_overload_alarm"].write_value(
-            motor_overload
-        )
-
-        # ---------------------------------------------------------
-        # Low Level
-        # ---------------------------------------------------------
-
-        low_level = tank_level < 20
-
-        await nodes["low_level_alarm"].write_value(
-            low_level
-        )
-
-        # ---------------------------------------------------------
-        # High Vibration
-        # ---------------------------------------------------------
-
-        high_vibration = vibration > 4.0
-
-        await nodes["high_vibration_alarm"].write_value(
-            high_vibration
-        )
-
-        # =========================================================
         # OVERALL FAULT
-        # =========================================================
 
         any_alarm = (
             high_temperature
             or high_pressure
-            or motor_overload
-            or low_level
-            or high_vibration
         )
 
         if any_alarm:
 
-            await nodes["fault_active"].write_value(True)
-            await nodes["machine_status"].write_value("ALARM")
+            await nodes[
+                "fault_active"
+            ].write_value(True)
 
-            await nodes["machine_running"].write_value(False)
-            await nodes["motor_running"].write_value(False)
+            await nodes[
+                "machine_status"
+            ].write_value("ALARM")
+
+            await nodes[
+                "machine_running"
+            ].write_value(False)
 
             print("ALARM detected.")
 
-        # =========================================================
-        # WAIT
-        # =========================================================
+        else:
 
+            await nodes[
+                "fault_active"
+            ].write_value(False)
+
+        # WAIT
         await asyncio.sleep(2)
