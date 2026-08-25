@@ -215,15 +215,13 @@ async def simulate(nodes):
             tank_level += random.uniform(0.1, 0.3)
 
             if tank_level > 100:
-                tank_level = 60
+                tank_level = 60.0
 
             await nodes["tank_level"].write_value(
                 round(tank_level, 2)
             )
 
-            # -----------------------------------------------------
             # Vibration
-            # -----------------------------------------------------
 
             base_vibration = (
                 2.0
@@ -239,9 +237,7 @@ async def simulate(nodes):
                 round(max(0, vibration), 2)
             )
 
-            # -----------------------------------------------------
             # Production Count
-            # -----------------------------------------------------
 
             production_count = await nodes[
                 "production_count"
@@ -253,9 +249,7 @@ async def simulate(nodes):
                 production_count
             )
 
-        # =========================================================
         # MACHINE STOPPED
-        # =========================================================
 
         else:
 
@@ -279,9 +273,7 @@ async def simulate(nodes):
             await nodes["motor_current"].write_value(0.0)
             await nodes["motor_power"].write_value(0.0)
 
-        # =========================================================
         # ALARM LOGIC
-        # =========================================================
 
         process_temperature = await nodes[
             "process_temperature"
@@ -291,9 +283,7 @@ async def simulate(nodes):
             "process_pressure"
         ].read_value()
 
-        # ---------------------------------------------------------
         # High Temperature Alarm
-        # ---------------------------------------------------------
 
         high_temperature = (
             process_temperature
@@ -304,9 +294,7 @@ async def simulate(nodes):
             "high_temperature_alarm"
         ].write_value(high_temperature)
 
-        # ---------------------------------------------------------
         # High Pressure Alarm
-        # ---------------------------------------------------------
 
         high_pressure = (
             process_pressure > 5.7
