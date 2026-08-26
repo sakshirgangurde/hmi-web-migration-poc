@@ -1,0 +1,77 @@
+tags:
+
+  MotorSpeed:
+    node: "MotorSpeed"
+    type: "telemetry"
+
+  MotorTemperature:
+    node: "MotorTemperature"
+    type: "telemetry"
+
+  MotorCurrent:
+    node: "MotorCurrent"
+    type: "telemetry"
+
+  ProcessTemperature:
+    node: "ProcessTemperature"
+    type: "telemetry"
+
+  ProcessPressure:
+    node: "ProcessPressure"
+    type: "telemetry"
+
+  TankLevel:
+    node: "TankLevel"
+    type: "telemetry"
+
+  Vibration:
+    node: "Vibration"
+    type: "telemetry"
+
+  FlowRate:
+    node: "FlowRate"
+    type: "telemetry"
+
+  MotorPower:
+    node: "MotorPower"
+    type: "telemetry"
+
+  SpeedSetpoint:
+    node: "SpeedSetpoint"
+    type: "control"
+
+  TemperatureSetpoint:
+    node: "TemperatureSetpoint"
+    type: "control"
+
+  StartCommand:
+    node: "StartCommand"
+    type: "command"
+
+  StopCommand:
+    node: "StopCommand"
+    type: "command"
+
+  MachineRunning:
+    node: "MachineRunning"
+    type: "status"
+
+  MachineStatus:
+    node: "MachineStatus"
+    type: "status"
+
+  FaultActive:
+    node: "FaultActive"
+    type: "status"
+
+  HighTemperatureAlarm:
+    node: "HighTemperatureAlarm"
+    type: "alarm"
+
+  HighPressureAlarm:
+    node: "HighPressureAlarm"
+    type: "alarm"
+
+  ProductionCount:
+    node: "ProductionCount"
+    type: "production"

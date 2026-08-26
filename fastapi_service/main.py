@@ -36,6 +36,27 @@ async def root():
         "message": "HMI Web Migration API is running"
     }
 
+@app.get("/tags")
+async def get_tags():
+
+    tags = []
+
+    for tag_name in opcua_client.nodes:
+
+        config = opcua_client.tag_config.get(
+            tag_name,
+            {}
+        )
+
+        tags.append({
+            "name": tag_name,
+            "node": config.get("node"),
+            "type": config.get("type", "unknown")
+        })
+
+    return {
+        "tags": tags
+    }
 
 @app.get("/tags/{tag_name}/value")
 async def read_tag(tag_name: str):
@@ -69,8 +90,7 @@ async def write_tag(
 
         await opcua_client.write_value(
             tag_name,
-            request.value
-        )
+            request.value)
 
         return {
             "tag": tag_name,
@@ -82,5 +102,4 @@ async def write_tag(
 
         raise HTTPException(
             status_code=400,
-            detail=str(e)
-        )
+            detail=str(e))

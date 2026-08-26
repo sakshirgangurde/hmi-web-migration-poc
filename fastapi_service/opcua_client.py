@@ -1,30 +1,44 @@
 from asyncua import Client
+import yaml
 
 OPC_UA_URL = "opc.tcp://localhost:4840/freeopcua/server/"
 
 class OPCUAClient:
 
     def __init__(self):
+
         self.client = Client(OPC_UA_URL)
         self.nodes = {}
+        self.tag_config = {}
+
+    def load_tag_config(self):
+
+        with open("tags.yaml", "r") as file:
+
+            config = yaml.safe_load(file)
+
+        self.tag_config = config.get("tags", {})
+    # CONNECT
 
     async def connect(self):
-
         await self.client.connect()
-
         print("Connected to OPC-UA server.")
-
+        self.load_tag_config()
         await self.discover_nodes()
+
+    # DISCONNECT
 
     async def disconnect(self):
 
         await self.client.disconnect()
-
         print("Disconnected from OPC-UA server.")
 
-    async def discover_nodes(self):
+    # AUTO DISCOVER OPC-UA NODES
 
+    async def discover_nodes(self):
         objects = self.client.nodes.objects
+
+        # Find Machine
 
         production_line = await self.find_child(
             objects,
@@ -36,100 +50,54 @@ class OPCUAClient:
             "Machine1"
         )
 
-        telemetry = await self.find_child(
-            machine,
-            "Telemetry"
-        )
+        # Categories under Machine
 
-        controls = await self.find_child(
-            machine,
-            "Controls"
-        )
-
-        status = await self.find_child(
-            machine,
+        categories = [
+            "Telemetry",
+            "Controls",
             "Status"
-        )
-
-        # ---------------------------------------------------------
-        # Telemetry
-        # ---------------------------------------------------------
-
-        telemetry_names = [
-            "MotorSpeed",
-            "MotorTemperature",
-            "MotorCurrent",
-            "ProcessTemperature",
-            "ProcessPressure",
-            "TankLevel",
-            "Vibration",
-            "FlowRate",
-            "MotorPower",
         ]
 
-        for name in telemetry_names:
+        # Discover every variable automatically
 
-            node = await self.find_child(
-                telemetry,
-                name
+        for category_name in categories:
+
+            category = await self.find_child(
+                machine,
+                category_name
             )
 
-            self.nodes[name] = node
+            children = await category.get_children()
 
-        # ---------------------------------------------------------
-        # Controls
-        # ---------------------------------------------------------
+            for node in children:
 
-        control_names = [
-            "SpeedSetpoint",
-            "TemperatureSetpoint",
-            "StartCommand",
-            "StopCommand",
-        ]
+                # Get node class
+                node_class = await node.read_node_class()
 
-        for name in control_names:
+                # We only want Variable nodes
+                if node_class.name != "Variable":
+                    continue
 
-            node = await self.find_child(
-                controls,
-                name
-            )
+                browse_name = await node.read_browse_name()
 
-            self.nodes[name] = node
+                tag_name = browse_name.Name
 
-        # ---------------------------------------------------------
-        # Status
-        # ---------------------------------------------------------
+                self.nodes[tag_name] = node
 
-        status_names = [
-            "MachineRunning",
-            "MachineStatus",
-            "FaultActive",
-            "HighTemperatureAlarm",
-            "HighPressureAlarm",
-            "ProductionCount",
-        ]
-
-        for name in status_names:
-
-            node = await self.find_child(
-                status,
-                name
-            )
-
-            self.nodes[name] = node
+                print(
+                    f"Discovered: {category_name}/{tag_name}"
+                )
 
         print(
             f"Discovered {len(self.nodes)} OPC-UA nodes."
         )
 
+    # FIND CHILD NODE
+
     async def find_child(self, parent, name):
-
         children = await parent.get_children()
-
         for child in children:
-
             browse_name = await child.read_browse_name()
-
             if browse_name.Name == name:
                 return child
 
@@ -137,36 +105,52 @@ class OPCUAClient:
             f"Node '{name}' not found."
         )
 
+    # =========================================================
+    # READ VALUE
+    # =========================================================
+
     async def read_value(self, tag):
 
         if tag not in self.nodes:
+
             raise Exception(
                 f"Unknown tag: {tag}"
             )
 
         return await self.nodes[tag].read_value()
 
+
+    # =========================================================
+    # WRITE VALUE
+    # =========================================================
+
     async def write_value(self, tag, value):
 
         if tag not in self.nodes:
+
             raise Exception(
                 f"Unknown tag: {tag}"
             )
 
         node = self.nodes[tag]
 
+        # Read existing value to determine data type
         current_value = await node.read_value()
 
         if isinstance(current_value, bool):
+
             value = bool(value)
 
         elif isinstance(current_value, float):
+
             value = float(value)
 
         elif isinstance(current_value, int):
+
             value = int(value)
 
         elif isinstance(current_value, str):
+
             value = str(value)
 
         await node.write_value(value)

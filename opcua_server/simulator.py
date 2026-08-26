@@ -1,16 +1,13 @@
 import asyncio
 import random
 
-
 async def simulate(nodes):
 
     print("Machine simulator started.")
 
     while True:
 
-        # =========================================================
         # READ CONTROL VALUES
-        # =========================================================
 
         speed_setpoint = await nodes[
             "speed_setpoint"

@@ -1,7 +1,6 @@
 async def create_nodes(server, idx):
 
     # Production Line
-
     production_line = await server.nodes.objects.add_object(
         idx,
         "ProductionLine1")
@@ -11,7 +10,6 @@ async def create_nodes(server, idx):
         "Machine1")
 
     # Telemetry
-
     telemetry = await machine.add_object(
         idx,
         "Telemetry")
