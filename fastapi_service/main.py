@@ -97,6 +97,12 @@ async def write_tag(
             "value": request.value,
             "message": "Value written successfully"
         }
+    except PermissionError as e:
+
+        raise HTTPException(
+            status_code=403,
+            detail=str(e)
+        )
 
     except Exception as e:
 

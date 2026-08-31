@@ -124,12 +124,40 @@ class OPCUAClient:
     # WRITE VALUE
     # =========================================================
 
+# =========================================================
+# WRITE VALUE
+# =========================================================
+
     async def write_value(self, tag, value):
 
         if tag not in self.nodes:
 
             raise Exception(
                 f"Unknown tag: {tag}"
+            )
+
+        # Get tag configuration from tags.yaml
+        config = self.tag_config.get(tag)
+
+        if not config:
+
+            raise Exception(
+                f"No configuration found for tag: {tag}"
+            )
+
+        tag_type = config.get("type")
+
+        # Only controls and commands can be written
+        writable_types = [
+            "control",
+            "command"
+        ]
+
+        if tag_type not in writable_types:
+
+            raise PermissionError(
+                f"Tag '{tag}' is read-only "
+                f"(type: {tag_type})"
             )
 
         node = self.nodes[tag]
